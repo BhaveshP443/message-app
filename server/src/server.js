@@ -49,7 +49,7 @@ async function start() {
     );
 
     // Handle preflight
-    app.options("*", cors());
+    // app.options("*", cors());
 
     // ===== MIDDLEWARE =====
     app.use(express.json());
