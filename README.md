@@ -1,368 +1,69 @@
-## Connect - Global Real-time Messaging App
+# Connect – Global Real-time Messaging App
 
-Full‑stack WhatsApp‑style chat app with JWT auth, MongoDB, and Socket.io.
+WhatsApp-style 1‑on‑1 chat with JWT auth, MongoDB, and Socket.io. Features: real-time delivery, online/last-seen, typing indicators, read receipts, auto-scroll.
 
-**Quick demo accounts**
-
-- `test1@example.com` / `Password123!`
-- `test2@example.com` / `Password123!`
+**Demo accounts:** `test1@example.com` / `Password123!` · `test2@example.com` / `Password123!`
 
 ---
 
-### 1. Features
+## Tech Stack
 
-- **Authentication**
-  - Email/password registration and login (JWT-based)
-  - Basic profile: display name, about, avatar URL
-- **Real‑time chat**
-  - 1‑on‑1 conversations
-  - Instant delivery via Socket.io
-  - Message history with pagination-ready schema
-- **Rich chat experience**
-  - Online / last‑seen presence
-  - Typing indicators
-  - Read receipts (sent → read)
-  - Auto‑scroll to latest messages
-  - Responsive layout (desktop + mobile)
+**Frontend:** React, Vite, Axios, Socket.io Client · **Backend:** Node, Express, Socket.io · **DB:** MongoDB (Mongoose)
 
 ---
 
-### 2. Tech Stack
+## Getting Started
 
-- **Frontend**: React + Vite, Axios, Socket.io Client
-- **Backend**: Node.js, Express, Socket.io
-- **Database**: MongoDB (Mongoose ODM)
-- **Auth & Security**: JWT, bcrypt, sanitize-html, CORS
-
----
-
-### 3. Getting Started (Local)
-
-#### 3.1 Backend
+**Backend**
 
 ```bash
 cd server
-cp .env.example .env        # or create .env manually on Windows
-npm install
-npm run seed                # create demo users
-npm run dev                 # start API + Socket.io on http://localhost:5000
+cp .env.example .env   # set MONGO_URI, JWT_SECRET, CLIENT_ORIGIN
+npm install && npm run seed && npm run dev
 ```
 
-`server/.env` (local example):
-
-```env
-PORT=5000
-MONGO_URI=mongodb://localhost:27017/chat-app
-JWT_SECRET=dev_local_jwt_secret_change_me
-CLIENT_ORIGIN=http://localhost:5173
-```
-
-#### 3.2 Frontend
+**Frontend**
 
 ```bash
 cd client
-npm install
-npm run dev                 # start Vite on http://localhost:5173
+# .env: VITE_API_BASE_URL=http://localhost:5000  VITE_SOCKET_URL=http://localhost:5000
+npm install && npm run dev
 ```
 
-`client/.env` (local example):
-
-```env
-VITE_API_BASE_URL=http://localhost:5000
-VITE_SOCKET_URL=http://localhost:5000
-```
-
-Open `http://localhost:5173` in two browsers/devices, log in with the test accounts above, and start chatting.
+Open http://localhost:5173, log in with the demo accounts in two tabs, and chat.
 
 ---
 
-### 4. Architecture
+## Environment
 
-- **Client (React/Vite)**
-  - Uses Axios for REST calls (auth, profile, search, history).
-  - Uses Socket.io Client for real‑time messaging, typing, and read events.
-- **Server (Node/Express)**
-  - Exposes `/api` routes for auth, users, conversations, and messages.
-  - Hosts Socket.io on the same HTTP server.
-- **Database (MongoDB)**
-  - `User` – email, password hash, display name, about, avatar, `isOnline`, `lastSeenAt`.
-  - `Conversation` – array of 2 participants, `lastMessageAt`.
-  - `Message` – `conversation`, `from`, `to`, `content`, `sentAt`, `readAt`.
-
-Indexes on `email`, `participants`, and `(conversation, createdAt)` keep lookups and pagination fast.
+| Location   | Variable             | Example / purpose                          |
+|-----------|----------------------|--------------------------------------------|
+| `server/` | `PORT`               | `5000`                                     |
+| `server/` | `MONGO_URI`          | MongoDB connection string                   |
+| `server/` | `JWT_SECRET`         | Strong secret for JWT                       |
+| `server/` | `CLIENT_ORIGIN`      | `http://localhost:5173` (CORS + Socket.io)  |
+| `client/` | `VITE_API_BASE_URL`  | Backend URL for REST                        |
+| `client/` | `VITE_SOCKET_URL`    | Backend URL for Socket.io                   |
 
 ---
 
-### 5. REST API (Base: `/api`)
+## API & Socket (summary)
 
-#### Auth
+- **REST** (base `/api`): `POST /auth/register`, `POST /auth/login` · `GET/PUT /users/me`, `GET /users?q=` · `GET /chat/conversations`, `POST /chat/conversations/with`, `GET /chat/conversations/:id/messages`, `POST /chat/messages`, `POST /chat/conversations/:id/read`
+- **Socket.io:** client emits `conversation:join`, `message:send`, `typing`, `messages:markRead`; server emits `message:new`, `typing`, `messages:read`
 
-- `POST /auth/register`
-  - Body: `{ email, password, displayName }`
-  - Response: `{ token, user }`
-- `POST /auth/login`
-  - Body: `{ email, password }`
-  - Response: `{ token, user }`
-
-#### Users (all require `Authorization: Bearer <token>`)
-
-- `GET /users/me` – current user profile.
-- `PUT /users/me` – update profile; body: `{ displayName?, about?, avatarUrl? }`
-- `GET /users?q=<search>` – list/search users (excluding current user).
-
-#### Chat / Conversations
-
-- `GET /chat/conversations`
-  - List conversations (with participants + `lastMessage`) for current user.
-- `POST /chat/conversations/with`
-  - Body: `{ userId }` – get or create a 1‑on‑1 conversation with that user.
-- `GET /chat/conversations/:id/messages`
-  - Query: `before?` (ISO date), `limit?` (default 30).
-  - Returns messages oldest → newest.
-- `POST /chat/messages`
-  - Body: `{ toUserId, content }`
-  - Creates a message, returns `{ conversationId, message }`, broadcasts via Socket.io.
-- `POST /chat/conversations/:id/read`
-  - Marks all messages in that conversation **to the current user** as read.
+(Full request/response details are in the code: `server/src/routes/`, `server/src/socket/`.)
 
 ---
 
-### 6. Socket.io Events
+## Deployment
 
-#### Client → Server
-
-- `conversation:join` – `conversationId`
-- `message:send` – `{ toUserId, content }`
-- `typing` – `{ toUserId, isTyping: boolean }`
-- `messages:markRead` – `conversationId`
-
-#### Server → Client
-
-- `message:new` – message object (includes `conversationId`)
-- `typing` – `{ fromUserId, isTyping }`
-- `messages:read` – `{ conversationId, userId }`
+- **Backend:** Deploy `server` (e.g. Render/Railway). Set env from `.env.example`, enable WebSockets, set `CLIENT_ORIGIN` to your frontend URL.
+- **Frontend:** Deploy `client` (e.g. Vercel). Set `VITE_API_BASE_URL` and `VITE_SOCKET_URL` to the deployed backend URL.
 
 ---
 
-### 7. Configuration & Scripts
+## Security & scope
 
-#### Server env (`server/.env`)
-
-- `PORT` – HTTP port (default `5000`)
-- `MONGO_URI` – MongoDB connection string
-- `JWT_SECRET` – secret key for JWT signing
-- `CLIENT_ORIGINS` (or `CLIENT_ORIGIN`) – allowed frontend origins for CORS/Socket.io  
-  e.g. `CLIENT_ORIGINS=http://localhost:5173,https://your-frontend.com`
-
-Server scripts:
-
-- `npm run dev` – start API + Socket.io with nodemon
-- `npm start` – start API in production mode
-- `npm run seed` – create demo users in MongoDB
-
-#### Client env (`client/.env`)
-
-- `VITE_API_BASE_URL` – REST base URL (e.g. `http://localhost:5000`)
-- `VITE_SOCKET_URL` – Socket.io base URL (e.g. `http://localhost:5000`)
-
-Client scripts:
-
-- `npm run dev` – start Vite dev server
-- `npm run build` – production build
-- `npm run preview` – preview production build locally
-
----
-
-### 8. Deployment Notes
-
-- **Backend** (Render/Railway/other)
-  - Deploy `server` as a Node service.
-  - Set env vars from `server/.env.example`.
-  - Ensure WebSockets are enabled.
-  - Set `CLIENT_ORIGINS` to your frontend URL (and optionally local dev URL).
-- **Frontend** (Vercel/Netlify/other)
-  - Deploy `client` as a Vite app.
-  - Set `VITE_API_BASE_URL` and `VITE_SOCKET_URL` to your backend URL.
-
----
-
-### 9. Security & Privacy
-
-- Passwords stored as **bcrypt hashes**, never in plain text.
-- JWT tokens signed with `JWT_SECRET` and validated on each protected request.
-- Message content sanitized with `sanitize-html` to prevent XSS.
-- CORS restricted to configured origins via `CLIENT_ORIGINS`.
-
----
-
-### 10. Known Limitations / Roadmap
-
-- Only **1‑on‑1** chats (no group conversations yet).
-- Text‑only messages (no images/files/voice notes).
-- No push notifications or multi‑device session sync yet.
-
-**Potential next steps**:
-
-- Group chats and broadcast lists.
-- Media messages (images, files, emoji picker).
-- Message delete/edit with audit history.
-- “Seen at” timestamps per message.
-- Admin dashboards (user activity, conversation analytics).
-
-## Connect - Global Real-time Messaging App
-
-Full-stack WhatsApp-style chat app with JWT auth, MongoDB, and Socket.io.
-
-**Quick demo accounts**
-
-- `test1@example.com` / `Password123!`
-- `test2@example.com` / `Password123!`
-
-### Overview
-
-Connect is a 1‑on‑1 messaging app with real-time delivery, online/last-seen presence, typing indicators, and read receipts. It is designed to be production-ready for a small/medium user base and easy to extend with features like group chats or media messages.
-
-### Tech Stack
-
-- **Frontend**: React + Vite, Axios, Socket.io Client
-- **Backend**: Node.js, Express, MongoDB (Mongoose), Socket.io, JWT, bcrypt
-
-### Local Setup
-
-- **1. Backend**
-  - `cd server`
-  - Copy env: `cp .env.example .env` (or create `.env` on Windows)
-  - Set `MONGO_URI`, `JWT_SECRET`, `CLIENT_ORIGIN=http://localhost:5173`
-  - Install deps: `npm install`
-  - Seed test users: `npm run seed`
-  - Start server: `npm run dev`
-
-- **2. Frontend**
-  - `cd client`
-  - `npm install`
-  - Create `.env` with:
-    - `VITE_API_BASE_URL=http://localhost:5000`
-    - `VITE_SOCKET_URL=http://localhost:5000`
-  - Start dev server: `npm run dev`
-
-### Test Credentials
-
-- **User 1**
-  - Email: `test1@example.com`
-  - Password: `Password123!`
-
-- **User 2**
-  - Email: `test2@example.com`
-  - Password: `Password123!`
-
-Open the app in two browsers/devices, log in as each user, and start a chat to see:
-
-- Online/last-seen presence
-- Typing indicators
-- Read receipts
-- Auto-scrolling, responsive chat layout
-
-### Architecture
-
-- **Client (React/Vite)**:
-  - Talks to REST API for auth, profile, user search, and message history.
-  - Maintains a Socket.io connection for new messages, typing, and read events.
-- **Server (Node/Express)**:
-  - Exposes `/api` routes for auth, users, conversations, and messages.
-  - Hosts a Socket.io server bound to the same HTTP server.
-- **Database (MongoDB)**:
-  - `User` – auth + profile, presence (`isOnline`, `lastSeenAt`).
-  - `Conversation` – participants array (2 users), `lastMessageAt`.
-  - `Message` – `conversation`, `from`, `to`, `content`, `sentAt`, `readAt`.
-
-Indexes are defined on `email`, `participants`, and `(conversation, createdAt)` to keep lookups and pagination fast.
-
-### REST API Endpoints (Base: `/api`)
-
-- **Auth**
-  - `POST /auth/register`
-    - Body: `{ email, password, displayName }`
-    - Response: `{ token, user }`
-  - `POST /auth/login`
-    - Body: `{ email, password }`
-    - Response: `{ token, user }`
-
-- **Users** (all require `Authorization: Bearer <token>`)
-  - `GET /users/me` – current user profile.
-  - `PUT /users/me` – update profile.
-    - Body (any subset): `{ displayName, about, avatarUrl }`
-  - `GET /users?q=<search>` – list/search users (excluding current user).
-
-- **Chat / Conversations**
-  - `GET /chat/conversations`
-    - Returns conversations for current user with participants + `lastMessage`.
-  - `POST /chat/conversations/with`
-    - Body: `{ userId }` – get or create 1‑on‑1 conversation with that user.
-  - `GET /chat/conversations/:id/messages`
-    - Query: `before?` (ISO date), `limit?` (default 30).
-    - Returns messages in that conversation, oldest → newest.
-  - `POST /chat/messages`
-    - Body: `{ toUserId, content }`
-    - Creates/returns: `{ conversationId, message }` and broadcasts via Socket.io.
-  - `POST /chat/conversations/:id/read`
-    - Marks all messages in that conversation **to the current user** as read.
-
-### Socket.io Events
-
-- **Client → Server**
-  - `conversation:join` – payload: `conversationId`
-  - `message:send` – payload: `{ toUserId, content }`
-  - `typing` – payload: `{ toUserId, isTyping: boolean }`
-  - `messages:markRead` – payload: `conversationId`
-
-- **Server → Client**
-  - `message:new` – new message object (includes `conversationId`)
-  - `typing` – `{ fromUserId, isTyping }`
-  - `messages:read` – `{ conversationId, userId }`
-
-### Configuration & Scripts
-
-- **Server env (`server/.env`)**
-  - `PORT` – HTTP port (default `5000`)
-  - `MONGO_URI` – MongoDB connection string
-  - `JWT_SECRET` – secret key for JWT signing
-  - `CLIENT_ORIGIN` – frontend origin for CORS (e.g. `http://localhost:5173`)
-
-- **Client env (`client/.env`)**
-  - `VITE_API_BASE_URL` – e.g. `http://localhost:5000`
-  - `VITE_SOCKET_URL` – e.g. `http://localhost:5000`
-
-- **Server scripts**
-  - `npm run dev` – start API + Socket.io with nodemon
-  - `npm start` – start API in production mode
-  - `npm run seed` – create test users in MongoDB
-
-- **Client scripts**
-  - `npm run dev` – start Vite dev server
-  - `npm run build` – production build
-  - `npm run preview` – preview production build locally
-
-### Deployment Notes
-
-- **Backend**: Deploy Node server (e.g. Render/Railway) with environment variables from `.env.example`, enable WebSockets, and allow CORS from your frontend URL.
-- **Frontend**: Deploy the Vite app (e.g. Vercel); set `VITE_API_BASE_URL` and `VITE_SOCKET_URL` to the deployed backend URL.
-
-### Security & Privacy
-
-- Passwords are stored as **bcrypt hashes**, never in plain text.
-- JWT tokens are signed with `JWT_SECRET` and checked on every protected route.
-- Message content is sanitized on the server with `sanitize-html` to prevent XSS.
-- CORS is restricted to `CLIENT_ORIGIN`; in production, this should be set to your exact frontend URL.
-
-### Known Limitations / Next Steps
-
-- Only **1‑on‑1** chats are supported (no group chats yet).
-- Messages are **text-only** (no images, files, or voice notes).
-- No push notifications or multi-device session management yet.
-
-Suggested future improvements: group conversations, media upload, message delete/edit, “message seen at” timestamps per message, and admin tooling (user and conversation analytics dashboards).
-
-
-#   m e s s a g e - a p p 
- 
- 
+Passwords hashed with bcrypt; JWT on protected routes; message content sanitized (XSS). CORS limited to `CLIENT_ORIGIN`.  
+Current scope: 1‑on‑1 text chat only (no groups, media, or push). See code for roadmap ideas.
