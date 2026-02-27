@@ -1,48 +1,81 @@
-const express = require('express');
-const http = require('http');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const cookieParser = require('cookie-parser');
-const { PORT, MONGO_URI, CLIENT_ORIGINS } = require('./config');
-const { createSocketServer } = require('./socket');
+const express = require("express");
+const http = require("http");
+const mongoose = require("mongoose");
+const cors = require("cors");
+const cookieParser = require("cookie-parser");
+require("dotenv").config();
 
-const authRoutes = require('./routes/auth');
-const userRoutes = require('./routes/users');
-const chatRoutes = require('./routes/chat');
+const authRoutes = require("./routes/auth");
+const userRoutes = require("./routes/users");
+const chatRoutes = require("./routes/chat");
+const { createSocketServer } = require("./socket");
 
+// ===== ENV =====
+const PORT = process.env.PORT || 5000;
+const MONGO_URI = process.env.MONGO_URI;
+
+// Allowed frontend origins
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://message-app-theta-eight.vercel.app",
+];
+
+// ===== START SERVER =====
 async function start() {
-  await mongoose.connect(MONGO_URI);
-  console.log('Connected to MongoDB');
+  try {
+    // Connect MongoDB
+    await mongoose.connect(MONGO_URI);
+    console.log("✅ Connected to MongoDB");
 
-  const app = express();
-  const server = http.createServer(app);
+    const app = express();
+    const server = http.createServer(app);
 
-  app.use(
-    cors({
-      origin: CLIENT_ORIGINS,
-      credentials: true,
-    })
-  );
-  app.use(express.json());
-  app.use(cookieParser());
+    // ===== CORS SETUP =====
+    app.use(
+      cors({
+        origin: function (origin, callback) {
+          // Allow server-to-server requests or tools like Postman
+          if (!origin) return callback(null, true);
 
-  app.use('/api/auth', authRoutes);
-  app.use('/api/users', userRoutes);
-  app.use('/api/chat', chatRoutes);
+          if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+          } else {
+            return callback(new Error("Not allowed by CORS"));
+          }
+        },
+        credentials: true,
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      })
+    );
 
-  app.get('/health', (req, res) => {
-    res.json({ ok: true });
-  });
+    // Handle preflight
+    app.options("*", cors());
 
-  createSocketServer(server);
+    // ===== MIDDLEWARE =====
+    app.use(express.json());
+    app.use(cookieParser());
 
-  server.listen(PORT, () => {
-    console.log(`Server listening on port ${PORT}`);
-  });
+    // ===== ROUTES =====
+    app.use("/api/auth", authRoutes);
+    app.use("/api/users", userRoutes);
+    app.use("/api/chat", chatRoutes);
+
+    // Health check route
+    app.get("/health", (req, res) => {
+      res.json({ ok: true });
+    });
+
+    // ===== SOCKET.IO =====
+    createSocketServer(server);
+
+    // ===== LISTEN =====
+    server.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error("❌ Failed to start server", err);
+    process.exit(1);
+  }
 }
 
-start().catch((err) => {
-  console.error('Failed to start server', err);
-  process.exit(1);
-});
-
+start();
